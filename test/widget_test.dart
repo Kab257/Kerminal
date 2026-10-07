@@ -6,7 +6,7 @@ void main() {
     await tester.pumpWidget(const KerminalApp());
 
     expect(find.text('Kerminal'), findsOneWidget);
-    expect(find.text('Kerminal v0.1.0'), findsOneWidget);
+    expect(find.text('Kerminal v0.2.0'), findsOneWidget);
     expect(find.text('Enter command...'), findsOneWidget);
   });
 }
