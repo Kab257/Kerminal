@@ -68,9 +68,14 @@ class KerminalHome extends StatefulWidget {
 class _KerminalHomeState extends State<KerminalHome> {
   static const _shell = MethodChannel('kerminal/shell');
   static const _outputChannel = EventChannel('kerminal/shell/output');
+  
 
-  final TextEditingController _commandController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _commandController =
+      TextEditingController();
+
+  final ScrollController _scrollController =
+      ScrollController();
+
   final FocusNode _commandFocusNode = FocusNode();
 
   final List<String> _output = [];
@@ -79,8 +84,11 @@ class _KerminalHomeState extends State<KerminalHome> {
 
   String _currentDirectory = '/';
   String _fontFamily = 'monospace';
+
   double _fontSize = 14;
-  Color _terminalColor = const Color(0xFF00FF66);
+
+  Color _terminalColor =
+      const Color(0xFF00FF66);
 
   bool _running = false;
   bool _showCommands = true;
@@ -88,17 +96,26 @@ class _KerminalHomeState extends State<KerminalHome> {
   @override
   void initState() {
     super.initState();
+
     _startShell();
 
     _outputSubscription =
         _outputChannel.receiveBroadcastStream().listen((event) {
       final text = event.toString();
 
-      if (text.isEmpty) return;
+      if (text.isEmpty) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _output.addAll(
-          text.split('\n').where((line) => line.isNotEmpty),
+          text
+              .split('\n')
+              .where((line) => line.isNotEmpty),
         );
       });
 
@@ -111,12 +128,20 @@ class _KerminalHomeState extends State<KerminalHome> {
     try {
       await _shell.invokeMethod('start');
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _running = true;
       });
 
       await _sendInternal('pwd');
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _output.add('Shell error: $e');
       });
@@ -125,10 +150,17 @@ class _KerminalHomeState extends State<KerminalHome> {
 
   Future<void> _sendInternal(String command) async {
     try {
-      await _shell.invokeMethod('write', {
-        'command': '$command\n',
-      });
+      await _shell.invokeMethod(
+        'write',
+        {
+          'command': '$command\n',
+        },
+      );
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _output.add('Command error: $e');
       });
@@ -136,13 +168,18 @@ class _KerminalHomeState extends State<KerminalHome> {
   }
 
   Future<void> _sendCommand() async {
-    final command = _commandController.text.trim();
+    final command =
+        _commandController.text.trim();
 
-    if (command.isEmpty || !_running) return;
+    if (command.isEmpty || !_running) {
+      return;
+    }
 
     if (_showCommands) {
       setState(() {
-        _output.add('$_currentDirectory \$ $command');
+        _output.add(
+          '$_currentDirectory \$ $command',
+        );
       });
     }
 
@@ -153,7 +190,10 @@ class _KerminalHomeState extends State<KerminalHome> {
     if (command == 'cd' ||
         command.startsWith('cd ') ||
         command == 'pwd') {
-      await Future.delayed(const Duration(milliseconds: 80));
+      await Future.delayed(
+        const Duration(milliseconds: 80),
+      );
+
       await _sendInternal('pwd');
     }
 
@@ -166,10 +206,16 @@ class _KerminalHomeState extends State<KerminalHome> {
     for (final line in lines) {
       final path = line.trim();
 
-      if (path.startsWith('/') && !path.contains(' ')) {
+      if (path.startsWith('/') &&
+          !path.contains(' ')) {
+        if (!mounted) {
+          return;
+        }
+
         setState(() {
           _currentDirectory = path;
         });
+
         break;
       }
     }
@@ -177,11 +223,14 @@ class _KerminalHomeState extends State<KerminalHome> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!_scrollController.hasClients) {
+        return;
+      }
 
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 120),
+        duration:
+            const Duration(milliseconds: 120),
         curve: Curves.easeOut,
       );
     });
@@ -192,6 +241,7 @@ class _KerminalHomeState extends State<KerminalHome> {
     _commandController.dispose();
     _scrollController.dispose();
     _commandFocusNode.dispose();
+
     _outputSubscription?.cancel();
 
     _shell.invokeMethod('stop');
@@ -202,7 +252,8 @@ class _KerminalHomeState extends State<KerminalHome> {
   void _showMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor:
+          Theme.of(context).scaffoldBackgroundColor,
       showDragHandle: true,
       builder: (context) {
         return SafeArea(
@@ -218,15 +269,19 @@ class _KerminalHomeState extends State<KerminalHome> {
                       fontSize: 20,
                     ),
                   ),
-                  subtitle: Text('Terminal & Tools'),
+                  subtitle:
+                      Text('Terminal & Tools'),
                 ),
+
                 const Divider(),
 
                 ListTile(
-                  leading: const Icon(Icons.palette_outlined),
+                  leading:
+                      const Icon(Icons.palette_outlined),
                   title: const Text('Theme'),
                   subtitle: Text(
-                    widget.themeMode == ThemeMode.dark
+                    widget.themeMode ==
+                            ThemeMode.dark
                         ? 'Dark'
                         : 'Light',
                   ),
@@ -234,29 +289,45 @@ class _KerminalHomeState extends State<KerminalHome> {
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.text_fields),
+                  leading:
+                      const Icon(Icons.text_fields),
                   title: const Text('Font'),
-                  subtitle: Text(_fontFamily),
+                  subtitle:
+                      Text(_fontFamily),
                   onTap: _showFontPicker,
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.format_size),
-                  title: const Text('Font size'),
-                  subtitle: Text('${_fontSize.toInt()} px'),
-                  onTap: _showFontSizePicker,
+                  leading:
+                      const Icon(Icons.format_size),
+                  title:
+                      const Text('Font size'),
+                  subtitle: Text(
+                    '${_fontSize.toInt()} px',
+                  ),
+                  onTap:
+                      _showFontSizePicker,
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.color_lens_outlined),
-                  title: const Text('Terminal color'),
-                  subtitle: const Text('Text / prompt color'),
-                  onTap: _showColorPicker,
+                  leading: const Icon(
+                    Icons.color_lens_outlined,
+                  ),
+                  title: const Text(
+                    'Terminal color',
+                  ),
+                  subtitle: const Text(
+                    'Text / prompt color',
+                  ),
+                  onTap:
+                      _showColorPicker,
                 ),
 
                 SwitchListTile(
-                  secondary: const Icon(Icons.terminal),
-                  title: const Text('Show commands'),
+                  secondary:
+                      const Icon(Icons.terminal),
+                  title:
+                      const Text('Show commands'),
                   subtitle: const Text(
                     'Display commands generated by Tools',
                   ),
@@ -265,12 +336,15 @@ class _KerminalHomeState extends State<KerminalHome> {
                     setState(() {
                       _showCommands = value;
                     });
+
                     Navigator.pop(context);
                   },
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.build_outlined),
+                  leading: const Icon(
+                    Icons.build_outlined,
+                  ),
                   title: const Text('Tools'),
                   subtitle: const Text(
                     'Files, duplicates, large files, media',
@@ -282,7 +356,8 @@ class _KerminalHomeState extends State<KerminalHome> {
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.info_outline),
+                  leading:
+                      const Icon(Icons.info_outline),
                   title: const Text('About'),
                   onTap: () {
                     Navigator.pop(context);
@@ -319,7 +394,9 @@ class _KerminalHomeState extends State<KerminalHome> {
               ListTile(
                 title: Text(
                   'Theme',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               RadioListTile<ThemeMode>(
@@ -356,22 +433,28 @@ class _KerminalHomeState extends State<KerminalHome> {
             const ListTile(
               title: Text(
                 'Font type',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             for (final font in fonts)
               ListTile(
                 title: Text(
                   font,
-                  style: TextStyle(fontFamily: font),
+                  style: TextStyle(
+                    fontFamily: font,
+                  ),
                 ),
-                trailing: _fontFamily == font
-                    ? const Icon(Icons.check)
-                    : null,
+                trailing:
+                    _fontFamily == font
+                        ? const Icon(Icons.check)
+                        : null,
                 onTap: () {
                   setState(() {
                     _fontFamily = font;
                   });
+
                   Navigator.pop(context);
                 },
               ),
@@ -390,15 +473,24 @@ class _KerminalHomeState extends State<KerminalHome> {
         double value = _fontSize;
 
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder:
+              (context, setSheetState) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                30,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Font size: ${value.toInt()} px',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Slider(
                     min: 10,
@@ -428,13 +520,20 @@ class _KerminalHomeState extends State<KerminalHome> {
     Navigator.pop(context);
 
     final colors = <String, Color>{
-      'Matrix Green': const Color(0xFF00FF66),
-      'Cyber Blue': const Color(0xFF00BFFF),
-      'Amber': const Color(0xFFFFB000),
-      'Classic White': const Color(0xFFE8E8E8),
-      'Red': const Color(0xFFFF4040),
-      'Cyan': const Color(0xFF00FFFF),
-      'Purple': const Color(0xFFB56CFF),
+      'Matrix Green':
+          const Color(0xFF00FF66),
+      'Cyber Blue':
+          const Color(0xFF00BFFF),
+      'Amber':
+          const Color(0xFFFFB000),
+      'Classic White':
+          const Color(0xFFE8E8E8),
+      'Red':
+          const Color(0xFFFF4040),
+      'Cyan':
+          const Color(0xFF00FFFF),
+      'Purple':
+          const Color(0xFFB56CFF),
     };
 
     showModalBottomSheet(
@@ -446,23 +545,34 @@ class _KerminalHomeState extends State<KerminalHome> {
             const ListTile(
               title: Text(
                 'Terminal color',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            for (final entry in colors.entries)
+            for (final entry
+                in colors.entries)
               ListTile(
                 leading: CircleAvatar(
                   radius: 9,
-                  backgroundColor: entry.value,
+                  backgroundColor:
+                      entry.value,
                 ),
-                title: Text(entry.key),
-                trailing: _terminalColor == entry.value
-                    ? const Icon(Icons.check)
-                    : null,
+                title:
+                    Text(entry.key),
+                trailing:
+                    _terminalColor ==
+                            entry.value
+                        ? const Icon(
+                            Icons.check,
+                          )
+                        : null,
                 onTap: () {
                   setState(() {
-                    _terminalColor = entry.value;
+                    _terminalColor =
+                        entry.value;
                   });
+
                   Navigator.pop(context);
                 },
               ),
@@ -476,7 +586,10 @@ class _KerminalHomeState extends State<KerminalHome> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const ToolsPage(),
+        builder: (_) => ToolsPage(
+          terminalColor: _terminalColor,
+          showCommands: _showCommands,
+        ),
       ),
     );
   }
@@ -485,13 +598,14 @@ class _KerminalHomeState extends State<KerminalHome> {
     showAboutDialog(
       context: context,
       applicationName: 'Kerminal',
-      applicationVersion: '0.3.0',
-      applicationLegalese: 'Android Terminal & Tools',
+      applicationVersion: '0.3.0+3',
+      applicationLegalese:
+          'Android Terminal & Tools',
       children: const [
         SizedBox(height: 16),
         Text(
-          'A powerful Android terminal with graphical file '
-          'and media tools.',
+          'A powerful Android terminal with graphical '
+          'file and media tools.',
         ),
       ],
     );
@@ -499,7 +613,9 @@ class _KerminalHomeState extends State<KerminalHome> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -514,13 +630,18 @@ class _KerminalHomeState extends State<KerminalHome> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: _terminalColor.withValues(alpha: 0.7),
+                    color:
+                        _terminalColor.withValues(
+                      alpha: 0.7,
+                    ),
                     blurRadius: 8,
                   ),
                 ],
               ),
             ),
+
             const SizedBox(width: 10),
+
             const Text(
               'Kerminal',
               style: TextStyle(
@@ -530,13 +651,16 @@ class _KerminalHomeState extends State<KerminalHome> {
             ),
           ],
         ),
+
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert),
+            icon:
+                const Icon(Icons.more_vert),
             onPressed: _showMenu,
           ),
         ],
       ),
+
       body: Stack(
         children: [
           Column(
@@ -547,29 +671,43 @@ class _KerminalHomeState extends State<KerminalHome> {
                   color: dark
                       ? const Color(0xFF030603)
                       : const Color(0xFFF8F9FA),
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(
+                  child:
+                      ListView.builder(
+                    controller:
+                        _scrollController,
+                    padding:
+                        const EdgeInsets.fromLTRB(
                       16,
                       14,
                       16,
                       110,
                     ),
-                    itemCount: _output.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == _output.length) {
+                    itemCount:
+                        _output.length + 1,
+                    itemBuilder:
+                        (context, index) {
+                      if (index ==
+                          _output.length) {
                         return _buildPrompt();
                       }
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: SelectableText(
+                        padding:
+                            const EdgeInsets.only(
+                          bottom: 3,
+                        ),
+                        child:
+                            SelectableText(
                           _output[index],
-                          style: TextStyle(
-                            fontFamily: _fontFamily,
-                            fontSize: _fontSize,
+                          style:
+                              TextStyle(
+                            fontFamily:
+                                _fontFamily,
+                            fontSize:
+                                _fontSize,
                             height: 1.35,
-                            color: _terminalColor,
+                            color:
+                                _terminalColor,
                           ),
                         ),
                       );
@@ -584,7 +722,8 @@ class _KerminalHomeState extends State<KerminalHome> {
             left: 12,
             right: 12,
             bottom: 14,
-            child: _buildFloatingCommandBar(),
+            child:
+                _buildFloatingCommandBar(),
           ),
         ],
       ),
@@ -593,23 +732,29 @@ class _KerminalHomeState extends State<KerminalHome> {
 
   Widget _buildPrompt() {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding:
+          const EdgeInsets.only(top: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment:
+            CrossAxisAlignment.center,
         children: [
           Flexible(
             child: Text(
               '$_currentDirectory \$',
-              overflow: TextOverflow.ellipsis,
+              overflow:
+                  TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: _fontFamily,
                 fontSize: _fontSize,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
                 color: _terminalColor,
               ),
             ),
           ),
+
           const SizedBox(width: 5),
+
           Container(
             width: 8,
             height: _fontSize + 2,
@@ -621,16 +766,20 @@ class _KerminalHomeState extends State<KerminalHome> {
   }
 
   Widget _buildFloatingCommandBar() {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     return Material(
       elevation: 12,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius:
+          BorderRadius.circular(18),
       color: dark
           ? const Color(0xFF111711)
-          : const Color(0xFFFFFFFF),
+          : Colors.white,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
+        padding:
+            const EdgeInsets.symmetric(
           horizontal: 8,
           vertical: 6,
         ),
@@ -642,40 +791,59 @@ class _KerminalHomeState extends State<KerminalHome> {
                 color: _terminalColor,
               ),
               onPressed: () {
-                _commandController.selection =
+                _commandController
+                    .selection =
                     TextSelection.fromPosition(
                   TextPosition(
-                    offset: _commandController.text.length,
+                    offset:
+                        _commandController
+                            .text
+                            .length,
                   ),
                 );
-                _commandFocusNode.requestFocus();
+
+                _commandFocusNode
+                    .requestFocus();
               },
             ),
+
             Expanded(
               child: TextField(
-                controller: _commandController,
-                focusNode: _commandFocusNode,
+                controller:
+                    _commandController,
+                focusNode:
+                    _commandFocusNode,
                 style: TextStyle(
-                  fontFamily: _fontFamily,
+                  fontFamily:
+                      _fontFamily,
                   fontSize: _fontSize,
-                  color: _terminalColor,
+                  color:
+                      _terminalColor,
                 ),
-                cursorColor: _terminalColor,
-                decoration: const InputDecoration(
-                  hintText: 'Enter command...',
-                  border: InputBorder.none,
+                cursorColor:
+                    _terminalColor,
+                decoration:
+                    const InputDecoration(
+                  hintText:
+                      'Enter command...',
+                  border:
+                      InputBorder.none,
                   isDense: true,
                 ),
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendCommand(),
+                textInputAction:
+                    TextInputAction.send,
+                onSubmitted: (_) =>
+                    _sendCommand(),
               ),
             ),
+
             IconButton(
               icon: Icon(
                 Icons.arrow_upward_rounded,
                 color: _terminalColor,
               ),
-              onPressed: _sendCommand,
+              onPressed:
+                  _sendCommand,
             ),
           ],
         ),
@@ -684,82 +852,426 @@ class _KerminalHomeState extends State<KerminalHome> {
   }
 }
 
-class ToolsPage extends StatelessWidget {
-  const ToolsPage({super.key});
+class ToolsPage extends StatefulWidget {
+  final Color terminalColor;
+  final bool showCommands;
+
+  const ToolsPage({
+    super.key,
+    required this.terminalColor,
+    required this.showCommands,
+  });
+
+  @override
+  State<ToolsPage> createState() =>
+      _ToolsPageState();
+}
+
+class _ToolsPageState
+    extends State<ToolsPage> {
+  static const MethodChannel _tools =
+      MethodChannel('kerminal/tools');
+
+  bool _busy = false;
+
+  String _status =
+      'Ready';
+
+  List<Map<String, dynamic>> _files =
+      [];
+
+  Future<void> _loadFiles() async {
+    setState(() {
+      _busy = true;
+      _status = 'Scanning storage...';
+    });
+
+    try {
+      final result =
+          await _tools.invokeMethod(
+        'listDirectory',
+        {
+          'path': '/storage/emulated/0',
+        },
+      );
+
+      final data =
+          List<Map<String, dynamic>>.from(
+        (result as List).map(
+          (item) =>
+              Map<String, dynamic>.from(
+            item,
+          ),
+        ),
+      );
+
+      setState(() {
+        _files = data;
+        _status =
+            '${data.length} items';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _getStorageInfo() async {
+    setState(() {
+      _busy = true;
+      _status =
+          'Reading storage information...';
+    });
+
+    try {
+      final result =
+          await _tools.invokeMethod(
+        'storageInfo',
+      );
+
+      final info =
+          Map<String, dynamic>.from(
+        result,
+      );
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title:
+                const Text('Storage'),
+            content: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total: ${_formatBytes(info['total'])}',
+                ),
+                const SizedBox(
+                  height: 8,
+                ),
+                Text(
+                  'Used: ${_formatBytes(info['used'])}',
+                ),
+                const SizedBox(
+                  height: 8,
+                ),
+                Text(
+                  'Free: ${_formatBytes(info['free'])}',
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      setState(() {
+        _status = 'Storage ready';
+      });
+    } catch (e) {
+      setState(() {
+        _status = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _busy = false;
+      });
+    }
+  }
+
+  String _formatBytes(dynamic value) {
+    final bytes =
+        (value as num?)?.toInt() ?? 0;
+
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+
+    if (bytes <
+        1024 * 1024) {
+      return
+          '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+
+    if (bytes <
+        1024 * 1024 * 1024) {
+      return
+          '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+
+    return
+        '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  IconData _iconForItem(
+    Map<String, dynamic> item,
+  ) {
+    final isDirectory =
+        item['isDirectory'] == true;
+
+    if (isDirectory) {
+      return Icons.folder;
+    }
+
+    final type =
+        item['type']?.toString() ?? '';
+
+    if (type.startsWith('image/')) {
+      return Icons.image;
+    }
+
+    if (type.startsWith('video/')) {
+      return Icons.video_file;
+    }
+
+    if (type.startsWith('audio/')) {
+      return Icons.audio_file;
+    }
+
+    return Icons.insert_drive_file;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tools'),
+        title:
+            const Text('Tools'),
+        actions: [
+          IconButton(
+            tooltip: 'Storage',
+            icon: const Icon(
+              Icons.storage_outlined,
+            ),
+            onPressed:
+                _busy
+                    ? null
+                    : _getStorageInfo,
+          ),
+        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          _toolCard(
-            context,
-            Icons.folder_outlined,
-            'File Manager',
-            'Browse, copy, move, rename and delete files.',
+          Padding(
+            padding:
+                const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Card(
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.folder_outlined,
+                        color:
+                            widget.terminalColor,
+                      ),
+                      title: const Text(
+                        'File Manager',
+                      ),
+                      subtitle:
+                          Text(_status),
+                      onTap:
+                          _busy
+                              ? null
+                              : _loadFiles,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          _toolCard(
-            context,
-            Icons.content_copy_outlined,
-            'Duplicates',
-            'Find duplicate files using intelligent scanning.',
-          ),
-          _toolCard(
-            context,
-            Icons.storage_outlined,
-            'Large Files',
-            'Find files from 250 MB up to any custom size.',
-          ),
-          _toolCard(
-            context,
-            Icons.image_outlined,
-            'Similar Images',
-            'Detect visually similar images.',
-          ),
-          _toolCard(
-            context,
-            Icons.video_library_outlined,
-            'Similar Videos',
-            'Compare videos using sampled visual frames.',
-          ),
-          _toolCard(
-            context,
-            Icons.audiotrack_outlined,
-            'Audio',
-            'Analyze large, duplicate and similar audio.',
+
+          Expanded(
+            child:
+                _files.isEmpty
+                    ? _buildToolsGrid()
+                    : _buildFileList(),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildToolsGrid() {
+    return ListView(
+      padding:
+          const EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        20,
+      ),
+      children: [
+        _toolCard(
+          Icons.folder_outlined,
+          'File Manager',
+          'Browse files and folders.',
+          _loadFiles,
+        ),
+        _toolCard(
+          Icons.content_copy_outlined,
+          'Duplicates',
+          'Find exact duplicate files.',
+          () {
+            _showComingSoon(
+              'Duplicate scanner',
+            );
+          },
+        ),
+        _toolCard(
+          Icons.storage_outlined,
+          'Large Files',
+          'Find files from 250 MB upward.',
+          () {
+            _showComingSoon(
+              'Large file scanner',
+            );
+          },
+        ),
+        _toolCard(
+          Icons.image_outlined,
+          'Similar Images',
+          'Visual image similarity analyzer.',
+          () {
+            _showComingSoon(
+              'Image AI analyzer',
+            );
+          },
+        ),
+        _toolCard(
+          Icons.video_library_outlined,
+          'Similar Videos',
+          'Compare sampled video frames.',
+          () {
+            _showComingSoon(
+              'Video AI analyzer',
+            );
+          },
+        ),
+        _toolCard(
+          Icons.audiotrack_outlined,
+          'Audio',
+          'Analyze audio files.',
+          () {
+            _showComingSoon(
+              'Audio analyzer',
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _toolCard(
-    BuildContext context,
     IconData icon,
     String title,
     String subtitle,
+    VoidCallback onTap,
   ) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin:
+          const EdgeInsets.only(
+        bottom: 12,
+      ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Icon(icon, size: 30),
+        contentPadding:
+            const EdgeInsets.all(16),
+        leading: Icon(
+          icon,
+          size: 30,
+          color:
+              widget.terminalColor,
+        ),
         title: Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
+          style:
+              const TextStyle(
+            fontWeight:
+                FontWeight.bold,
           ),
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Text(subtitle),
+          padding:
+              const EdgeInsets.only(
+            top: 5,
+          ),
+          child:
+              Text(subtitle),
         ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
+        trailing:
+            const Icon(
+          Icons.chevron_right,
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildFileList() {
+    return ListView.builder(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 12,
+      ),
+      itemCount: _files.length,
+      itemBuilder:
+          (context, index) {
+        final item =
+            _files[index];
+
+        final name =
+            item['name']
+                    ?.toString() ??
+                '';
+
+        final size =
+            item['size'];
+
+        final isDirectory =
+            item['isDirectory'] ==
+                true;
+
+        return ListTile(
+          leading: Icon(
+            _iconForItem(item),
+            color:
+                widget.terminalColor,
+          ),
+          title:
+              Text(name),
+          subtitle:
+              Text(
+            isDirectory
+                ? 'Folder'
+                : _formatBytes(size),
+          ),
+          trailing:
+              isDirectory
+                  ? const Icon(
+                      Icons.chevron_right,
+                    )
+                  : null,
+        );
+      },
+    );
+  }
+
+  void _showComingSoon(String name) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          '$name will be implemented in the next Tools stage.',
+        ),
       ),
     );
   }
